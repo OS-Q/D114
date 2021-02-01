@@ -1,12 +1,11 @@
 {
-  "name": "SMTP",
+  "name": "D114",
   "keywords": "Mail, SMTP",
   "description": "Mail",
-  "version": "1.0.0",
+  "version": "0.6.1",
   "authors": {
     "name":  "qitas",
-    "email": "qitas@qitas.cn",
-    "url": "http://tang.qitas.cn"
+    "email": "qitas@qitas.cn"
   },
   "repository": {
     "type": "git",
