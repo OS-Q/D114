@@ -1,32 +1,8 @@
-/**
- * ESP8266SMTPClient.cpp
- *
- * Created on: 04.07.2016
- *
- * Copyright (c) 2016 Pavel Moravec. All rights reserved.
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
- */
-
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 #include <StreamString.h>
 #include <base64.h>
-
 #include "ESP8266SMTPClient.h"
 
 /**
@@ -165,30 +141,30 @@ int SMTPClient::sendMessage(const char * from, String & payload, const char * to
  * @param subject const char *  Message subject (if NULL, will use pre-set header or not send subject at all)
  * @return -1 if no info or > 0 when Content-Length is set by server
  */
-int SMTPClient::sendMessage(const char * from, const char * payload, size_t size, const char * to, const char * subject) {    
+int SMTPClient::sendMessage(const char * from, const char * payload, size_t size, const char * to, const char * subject) {
     String command;
-    if (size==0) { size = strlen(payload); } 
+    if (size==0) { size = strlen(payload); }
 
     if (!connected()) {
       if(!connect()) {
           return returnError(SMTPC_ERROR_CONNECTION_REFUSED);
-      }     
+      }
     }
 
     addHeader("From", from);
-    if (subject) { 
+    if (subject) {
       String subj2 = subject;
       subj2 = "=?UTF-8?B?" + base64::encode(subj2) + "?=";
-      addHeader("Subject", subj2); 
+      addHeader("Subject", subj2);
     }
     addHeader("X-Mailer", _mailer);
-    if (to) { 
+    if (to) {
       addHeader("To", to);
-      addRecipients(to); 
+      addRecipients(to);
     }
 
     _returnCode = sendAddress("MAIL FROM: ", from);
-    if (_returnCode < 0 || _returnCode >= 400) { 
+    if (_returnCode < 0 || _returnCode >= 400) {
       return SMTPC_ERROR_INVALID_SENDER;
     }
 
@@ -199,26 +175,26 @@ int SMTPClient::sendMessage(const char * from, const char * payload, size_t size
          s2 = _Recipients.substring(startP);
          startP =-1;
        } else {
-         s2 = _Recipients.substring(startP, splitP);        
+         s2 = _Recipients.substring(startP, splitP);
          startP=splitP+1;
-         splitP=_Recipients.indexOf('\n', startP);       
+         splitP=_Recipients.indexOf('\n', startP);
        }
        s2.trim();
        if (s2.indexOf('<') >=0) { s2 = s2.substring(s2.indexOf('<')); }
        if (! s2.length()) { continue; }
        _returnCode = sendAddress("RCPT TO: ", s2.c_str());
-       if (_returnCode < 0 || _returnCode >= 400) { 
+       if (_returnCode < 0 || _returnCode >= 400) {
          return SMTPC_ERROR_INVALID_RECIPIENT;
-       }           
+       }
     } while (startP > 0);
-    
+
     _returnCode = sendRequest("DATA");
-    if (_returnCode < 0 || _returnCode >= 400) { 
-     return SMTPC_ERROR_INVALID_ENVELOPE;
-    }           
+    if (_returnCode < 0 || _returnCode >= 400) {
+        return SMTPC_ERROR_INVALID_ENVELOPE;
+    }
 
     // send Header
-    
+
     DEBUG_SMTPCLIENT("[SMTP-Client][sendMessage] headers: '%s'\n", _Headers.c_str());
     if(!sendHeaders()) {
         return returnError(SMTPC_ERROR_SEND_HEADER_FAILED);
@@ -231,22 +207,22 @@ int SMTPClient::sendMessage(const char * from, const char * payload, size_t size
         static const char * alternative = "\n..";
         const int alen = strlen(alternative);
         while (ptr=strstr(payload,"\n.")) {
-          size_t pos = ptr-payload;
-          size -= pos + alen;
-          if(_tcp->write(&payload[0], pos) != pos) {
-              return returnError(SMTPC_ERROR_SEND_PAYLOAD_FAILED);
-          }
-          if(_tcp->write(alternative, 4) != 4) {
-              return returnError(SMTPC_ERROR_SEND_PAYLOAD_FAILED);
-          }
-          payload = ptr + alen;
+            size_t pos = ptr-payload;
+            size -= pos + alen;
+            if(_tcp->write(&payload[0], pos) != pos) {
+                return returnError(SMTPC_ERROR_SEND_PAYLOAD_FAILED);
+            }
+            if(_tcp->write(alternative, 4) != 4) {
+                return returnError(SMTPC_ERROR_SEND_PAYLOAD_FAILED);
+            }
+            payload = ptr + alen;
         }
         if(_tcp->write(&payload[0], size) != size) {
             return returnError(SMTPC_ERROR_SEND_PAYLOAD_FAILED);
         }
     }
 	_returnCode = sendRequest("\r\n.");
-    
+
     /* Reset recepients after sending them */
     clearRecipients();
     clearHeaders();
@@ -255,7 +231,7 @@ int SMTPClient::sendMessage(const char * from, const char * payload, size_t size
 }
 
 int SMTPClient::sendAddress(String &cmd, String &address) {
-  return sendAddress(cmd.c_str(), address.c_str());
+    return sendAddress(cmd.c_str(), address.c_str());
 }
 
 int SMTPClient::sendAddress(const char *cmd, const char *address) {
@@ -263,18 +239,18 @@ int SMTPClient::sendAddress(const char *cmd, const char *address) {
     String a2 = address;
     a2.trim();
     if (strchr(address, '<')) {
-      command += a2;
+        command += a2;
     } else {
-      command += '<';
-      command += a2;
-      command += '>';
+        command += '<';
+        command += a2;
+        command += '>';
     }
     _returnCode = sendRequest(command);
-    if (_returnCode < 0 || _returnCode >= 400) { 
-      DEBUG_SMTPCLIENT("[SMTP-Client][sendAddress] failed command: '%s'\n", command.c_str());      
-      return _returnCode;
+    if (_returnCode < 0 || _returnCode >= 400) {
+        DEBUG_SMTPCLIENT("[SMTP-Client][sendAddress] failed command: '%s'\n", command.c_str());
+        return _returnCode;
     }
-  
+
 }
 
 
@@ -321,11 +297,11 @@ String SMTPClient::errorToString(int error) {
         case SMTPC_ERROR_UNAUTHORIZED:
             return String("login failed");
         case SMTPC_ERROR_INVALID_SENDER:
-            return String("invalid sender address");        
+            return String("invalid sender address");
         case SMTPC_ERROR_INVALID_RECIPIENT:
-            return String("invalid recepient address");        
+            return String("invalid recepient address");
         case SMTPC_ERROR_INVALID_ENVELOPE:
-            return String("error in E-mail envelope");        
+            return String("error in E-mail envelope");
         default:
             return String();
     }
@@ -474,19 +450,19 @@ bool SMTPClient::connect(void) {
       return false;
     }
 
-    _returnCode = sendRequest("HELO localhost");    
+    _returnCode = sendRequest("HELO localhost");
 
     if (_returnCode >= 0 && _base64User.length() && _base64Pass.length()) {
-      _returnCode = sendRequest("AUTH LOGIN");    
+      _returnCode = sendRequest("AUTH LOGIN");
       if (_returnCode > 0 && _returnCode < 400) {
-        _returnCode = sendRequest(_base64User);    
+        _returnCode = sendRequest(_base64User);
         _returnCode = sendRequest(_base64Pass);
       }
       if (_returnCode < 0 || _returnCode > 400) {
-        returnError(SMTPC_ERROR_UNAUTHORIZED);     
+        returnError(SMTPC_ERROR_UNAUTHORIZED);
       }
     }
-    
+
     return connected();
 }
 
@@ -545,13 +521,13 @@ int SMTPClient::handleResponse() {
             DEBUG_SMTPCLIENT("[SMTP-Client][handleResponse] RX: '%s'\n", headerLine.c_str());
       			_returnCode = headerLine.substring(0, 3).toInt();
             _ErrorMessage = headerLine.substring(3);
-            while(headerLine[3] == '-') { 
-      				headerLine = _tcp->readStringUntil('\n'); 
+            while(headerLine[3] == '-') {
+      				headerLine = _tcp->readStringUntil('\n');
               _ErrorMessage += '\n' + headerLine.substring(3);
       				DEBUG_SMTPCLIENT("[SMTP-Client][handleResponse] RX_line: '%s'\n", headerLine.c_str());
       			}
       			DEBUG_SMTPCLIENT("[SMTP-Client][handleResponse] code: %d\n", _returnCode);
-      
+
       			if(_returnCode) {
       				return _returnCode;
       			} else {
